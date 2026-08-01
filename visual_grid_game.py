@@ -49,15 +49,19 @@ class VisualGridHuntGame:
         self.collision = False
 
     def get_percept(self) -> dict:
+        ax, ay = self._get_ahead_position()
+        ahead_pos = (ax, ay)
+        wall_ahead = (not self._in_bounds(ax, ay)) or (ahead_pos in self.walls)
+ 
         return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
+            'wall_ahead': wall_ahead,
+            'food_here': tuple(self.agent_pos) in self.food_positions,
+            'toxin_here': tuple(self.agent_pos) in self.toxic_traps,
+            'hit_wall': self.hit_wall_last_move,   # True if last move_forward was blocked
+            'facing': self.facing,
             'collision': self.collision,
             'score': self.score,
             'remaining_food': len(self.food_positions),
-            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps
         }
 
     def execute_action(self, action: str):
@@ -105,6 +109,71 @@ class VisualGridHuntGame:
 
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
+
+class SimpleReflexAgent:
+    
+    def sense_and_act(self, percept):
+        if percept['food_here']:
+            return 'suck'
+        elif percept['wall_ahead']:
+            return 'turn_left'
+        else:
+            return 'move_forward'
+
+class ModelBasedAgent:
+ 
+    def __init__(self):
+        self.visited_cells = set()
+        self.last_action = None
+        self.pos_estimate = [0, 0]
+        self.facing_estimate = 'Right'
+        self.visited_cells.add(tuple(self.pos_estimate))
+ 
+    @staticmethod
+    def _turn(facing, turn):
+        idx = FACING_ORDER.index(facing)
+        if turn == 'turn_left':
+            return FACING_ORDER[(idx + 1) % 4]
+        elif turn == 'turn_right':
+            return FACING_ORDER[(idx - 1) % 4]
+        return facing
+ 
+    @staticmethod
+    def _ahead(pos, facing):
+        dx, dy = FACING_DELTA[facing]
+        return [pos[0] + dx, pos[1] + dy]
+ 
+    def sense_and_act(self, percept):
+        # --- 1. Update internal state (Transition & Sensor Model) based on
+        #        the action we took last turn and what actually happened ---
+        if self.last_action == 'move_forward' and not percept['hit_wall']:
+            self.pos_estimate = self._ahead(self.pos_estimate, self.facing_estimate)
+        elif self.last_action in ('turn_left', 'turn_right'):
+            self.facing_estimate = self._turn(self.facing_estimate, self.last_action)
+ 
+        self.visited_cells.add(tuple(self.pos_estimate))
+ 
+        ahead_cell = tuple(self._ahead(self.pos_estimate, self.facing_estimate))
+        left_facing = self._turn(self.facing_estimate, 'turn_left')
+        left_cell = tuple(self._ahead(self.pos_estimate, left_facing))
+ 
+        # --- 2. Query the memory to decide the next move ---
+        if percept['food_here']:
+            action = 'suck'
+        elif percept['wall_ahead'] and left_cell in self.visited_cells:
+            # Wall ahead AND we've already explored the left -> break the
+            # loop the simple reflex agent would get stuck in, try right.
+            action = 'turn_right'
+        elif percept['wall_ahead']:
+            action = 'turn_left'
+        elif ahead_cell in self.visited_cells:
+            # Nothing new ahead - turn to look for unexplored territory.
+            action = 'turn_left'
+        else:
+            action = 'move_forward'
+ 
+        self.last_action = action
+        return action
 
 
 class GridGameGUI:
