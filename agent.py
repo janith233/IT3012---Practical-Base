@@ -17,6 +17,12 @@ class GreedyGridAgent:
 class SearchAgent:
     def __init__(self):
         self.actions = ['Up', 'Down', 'Left', 'Right']
+        
+        # Search plan
+        self.plan = []
+
+        # Active search algorithm
+        self.active_algo = 'BFS'
 
     def get_neighbors(self, state, grid_size, walls):
         """
