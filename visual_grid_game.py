@@ -66,7 +66,10 @@ class VisualGridHuntGame:
             #new global states
             'grid_size': (self.width, self.height),
             'walls': list(self.walls),
-            'all_food': list(self.food_positions)
+            'all_food': list(self.food_positions),
+
+            #current agent position
+            'agent_pos': tuple(self.agent_pos)
         }
 
     def execute_action(self, action: str):
