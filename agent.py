@@ -154,3 +154,64 @@ def dfs_search(self, start, goal, grid_size, walls):
 
         return None
 
+#method to find the closest food
+def find_closest_food(self, start, food_positions):
+    if not food_positions:
+        return None
+
+    return min(
+        food_positions,
+        key=lambda food:
+            abs(food[0] - start[0]) +
+            abs(food[1] - start[1])
+    )
+
+def sense_and_act(self, percept):
+
+    # If there is no existing plan, create a new one
+    if not self.plan:
+
+        start = percept['agent_pos']
+        all_food = percept['all_food']
+        grid_size = percept['grid_size']
+        walls = set(tuple(wall) for wall in percept['walls'])
+
+        # If there is no food left
+        if not all_food:
+            return 'Stay'
+
+        # Find the closest food pellet
+        goal = self.find_closest_food(start, all_food)
+
+        # Execute the selected search algorithm
+        if self.active_algo == 'BFS':
+            self.plan = self.bfs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
+
+        elif self.active_algo == 'DFS':
+            self.plan = self.dfs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
+
+        elif self.active_algo == 'UCS':
+            self.plan = self.ucs_search(
+                start,
+                goal,
+                grid_size,
+                walls
+            )
+
+        # Search could not find a path
+        if self.plan is None:
+            self.plan = []
+            return 'Right'
+
+    # Execute the first action in the plan
+    return self.plan.pop(0)
